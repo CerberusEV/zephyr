@@ -23,11 +23,21 @@
 	defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C)
 #include <mbedtls/memory_buffer_alloc.h>
 
-#ifdef CONFIG_MBEDTLS_HEAP_CUSTOM_SECTION
+#if defined(CONFIG_ESP_SPIRAM) && defined(CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY)
+/* Cerberus downstream patch: keep the (large) mbedTLS heap in external PSRAM
+ * rather than internal SRAM.  Without this the CONFIG_MBEDTLS_HEAP_SIZE array
+ * lands in .dram0.bss and blows the ESP32-S3 internal DRAM budget (the heap is
+ * 160 KB on the Dually board, vs ~384 KB of dram0 total).  See the
+ * MBEDTLS_HEAP_SIZE note in the app prj.conf.
+ *
+ * Carried on the CerberusEV zephyr fork; rebase this onto each upstream bump. */
+#include <esp_attr.h>
+#define HEAP_MEM_ATTRIBUTES EXT_RAM_BSS_ATTR
+#elif defined(CONFIG_MBEDTLS_HEAP_CUSTOM_SECTION)
 #define HEAP_MEM_ATTRIBUTES Z_GENERIC_SECTION(.mbedtls_heap)
 #else
 #define HEAP_MEM_ATTRIBUTES
-#endif /* CONFIG_MBEDTLS_HEAP_CUSTOM_SECTION */
+#endif /* PSRAM / CONFIG_MBEDTLS_HEAP_CUSTOM_SECTION */
 static unsigned char _mbedtls_heap[CONFIG_MBEDTLS_HEAP_SIZE] HEAP_MEM_ATTRIBUTES;
 
 static void init_heap(void)
