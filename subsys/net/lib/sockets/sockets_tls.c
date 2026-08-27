@@ -289,8 +289,23 @@ static uint8_t dtls_helper_buf[DTLS_HELPER_BUF_SIZE];
 static K_MUTEX_DEFINE(dtls_helper_buf_lock);
 #endif
 
+/* Cerberus downstream patch: keep the TLS context pool in external PSRAM on
+ * ESP32 SPIRAM targets.  Each context is ~2.7 KB of pure CPU state (mbedTLS
+ * ssl/config/x509 structs — no DMA, no ISR access), so the pool otherwise
+ * costs CONFIG_NET_SOCKETS_TLS_MAX_CONTEXTS x ~2.7 KB of internal DRAM.  The
+ * mbedTLS heap these contexts allocate from already lives in PSRAM (see the
+ * modules/mbedtls/zephyr_init.c patch).
+ *
+ * Carried on the CerberusEV zephyr fork; rebase this onto each upstream bump.
+ */
+#if defined(CONFIG_ESP_SPIRAM) && defined(CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY)
+#define TLS_CONTEXT_POOL_ATTR __attribute__((section(".ext_ram.bss")))
+#else
+#define TLS_CONTEXT_POOL_ATTR
+#endif
+
 /* A global pool of TLS contexts. */
-static struct tls_context tls_contexts[CONFIG_NET_SOCKETS_TLS_MAX_CONTEXTS];
+static TLS_CONTEXT_POOL_ATTR struct tls_context tls_contexts[CONFIG_NET_SOCKETS_TLS_MAX_CONTEXTS];
 K_MEM_SLAB_DEFINE_STATIC(tls_session_contexts, sizeof(struct tls_session_context),
 			 CONFIG_NET_SOCKETS_TLS_MAX_SESSION_CONTEXTS,
 			 __alignof__(struct tls_session_context));
