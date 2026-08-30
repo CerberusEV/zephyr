@@ -109,11 +109,36 @@ properties:
       Chip select setup time setting, see TRF for SOC for details of
       timing applied.
 
+      Amount of SPI bit-cycles CS is activated before the transmission
+      (equivalent to ESP-IDF cs_ena_pretrans). Only applied when the
+      hardware CS line is used (no cs-gpios); with GPIO chip select the
+      controller has no control over CS timing.
+
   cs-hold-time:
     type: int
     description: |
       Chip select hold time setting, see TRF for SOC for details of
       timing applied.
+
+      Amount of SPI bit-cycles CS is kept active after the transmission
+      (equivalent to ESP-IDF cs_ena_posttrans). Only applied when the
+      hardware CS line is used (no cs-gpios).
+
+  duty-cycle-pos:
+    type: int
+    description: |
+      Duty cycle of the positive SPI clock phase, in 1/256th increments
+      (128 = 50% duty cycle). Equivalent to ESP-IDF duty_cycle_pos.
+      0 (or omitting the property) selects the default 50% duty cycle.
+
+  input-delay-ns:
+    type: int
+    description: |
+      Maximum data-valid time of the slave: the time between the SPI
+      launch clock edge and the moment MISO data is stable, in
+      nanoseconds. Equivalent to ESP-IDF input_delay_ns. The driver uses
+      it to compensate the MISO sampling point, which both allows higher
+      clock speeds and fixes sampling of slow slaves at moderate speeds.
 
   line-idle-low:
     type: boolean

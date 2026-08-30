@@ -777,8 +777,8 @@ static DEVICE_API(spi, spi_api) = {
 		.spi = (spi_dev_t *)DT_INST_REG_ADDR(idx),	\
 			\
 		.clock_dev = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(idx)),	\
-		.duty_cycle = 0, \
-		.input_delay_ns = 0, \
+		.duty_cycle = DT_INST_PROP_OR(idx, duty_cycle_pos, 0), \
+		.input_delay_ns = DT_INST_PROP_OR(idx, input_delay_ns, 0), \
 		.irq_source = DT_INST_IRQ_BY_IDX(idx, 0, irq), \
 		.irq_priority = DT_INST_IRQ_BY_IDX(idx, 0, priority), \
 		.irq_flags = DT_INST_IRQ_BY_IDX(idx, 0, flags), \
