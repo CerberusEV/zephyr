@@ -381,15 +381,7 @@ static int verify_nth16(struct cdc_ncm_eth_data *const data,
 		return -EINVAL;
 	}
 
-	/*
-	 * The received transfer may be longer than the NTB it carries. When
-	 * wBlockLength is an exact multiple of the bulk OUT wMaxPacketSize,
-	 * hosts (e.g. Windows) append pad byte(s) so the transfer ends in a
-	 * short packet instead of requiring a terminating ZLP. Only a transfer
-	 * SHORTER than wBlockLength is a genuine (truncated) error; trailing
-	 * pad beyond wBlockLength is ignored via the NTB offsets below.
-	 */
-	if (sys_le16_to_cpu(nthdr16->wBlockLength) > len) {
+	if (sys_le16_to_cpu(nthdr16->wBlockLength) != len) {
 		LOG_DBG("DROP: %s len %d", "block",
 			sys_le16_to_cpu(nthdr16->wBlockLength));
 		return -EINVAL;
