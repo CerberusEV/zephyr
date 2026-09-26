@@ -25,6 +25,17 @@ config USBD_CDC_NCM_SUPPORT_NTB32
 	  Enable support for NTB32 format which allows larger
 	  packet sizes.
 
+config USBD_CDC_NCM_HWINFO_MAC
+	bool "Derive the host-side NCM MAC from HWINFO"
+	depends on HWINFO
+	help
+	  Personalize the host-side MAC address (the iMACAddress string the USB
+	  host adopts for its virtual NCM adapter) per device by replacing the low
+	  three octets of the devicetree remote-mac-address with bytes from the
+	  SoC unique ID. Without this, every unit presents the same fixed
+	  remote-mac-address, so two identical devices on one host enumerate with
+	  the same adapter MAC and therefore the same IPv6 link-local address.
+
 module = USBD_CDC_NCM
 module-str = usbd cdc_ncm
 source "subsys/logging/Kconfig.template.log_config"

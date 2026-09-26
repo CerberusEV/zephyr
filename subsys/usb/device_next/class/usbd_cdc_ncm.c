@@ -15,6 +15,9 @@
 #include <zephyr/usb/usb_ch9.h>
 #include <zephyr/usb/class/usb_cdc.h>
 #include <zephyr/drivers/usb/udc.h>
+#if defined(CONFIG_USBD_CDC_NCM_HWINFO_MAC)
+#include <zephyr/drivers/hwinfo.h>
+#endif
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cdc_ncm, CONFIG_USBD_CDC_NCM_LOG_LEVEL);
@@ -1184,6 +1187,35 @@ static int usbd_cdc_ncm_preinit(const struct device *dev)
 		gen_random_mac(data->mac_addr, 0, 0, 0);
 	}
 
+#if defined(CONFIG_USBD_CDC_NCM_HWINFO_MAC)
+	/* Personalize the host-side MAC (the iMACAddress string the host adopts
+	 * for its virtual adapter) from the SoC unique ID, so two identical units
+	 * on one host get distinct NCM adapter MACs — and therefore distinct IPv6
+	 * link-local addresses.  Keep the first three octets from the
+	 * remote-mac-address DT property (the LAA/OUI prefix) and replace the low
+	 * three octets.  The string is 12 uppercase hex chars, no separators. */
+	{
+		uint8_t hwid[8];
+		ssize_t hlen = hwinfo_get_device_id(hwid, sizeof(hwid));
+
+		if (hlen >= 3) {
+			static const char hex[] = "0123456789ABCDEF";
+			uint8_t *macstr = (uint8_t *)data->mac_desc_data->ptr;
+
+			macstr[6]  = hex[(hwid[hlen - 3] >> 4) & 0x0F];
+			macstr[7]  = hex[hwid[hlen - 3] & 0x0F];
+			macstr[8]  = hex[(hwid[hlen - 2] >> 4) & 0x0F];
+			macstr[9]  = hex[hwid[hlen - 2] & 0x0F];
+			macstr[10] = hex[(hwid[hlen - 1] >> 4) & 0x0F];
+			macstr[11] = hex[hwid[hlen - 1] & 0x0F];
+			LOG_INF("CDC NCM host MAC personalized from HWINFO");
+		} else {
+			LOG_WRN("CDC NCM: hwinfo_get_device_id failed (%d); "
+				"keeping DT remote-mac-address", (int)hlen);
+		}
+	}
+#endif
+
 	LOG_DBG("CDC NCM device initialized");
 
 	return 0;
@@ -1385,11 +1417,25 @@ const static struct usb_desc_header *cdc_ncm_hs_desc_##n[] = {			\
 	(struct usb_desc_header *) &cdc_ncm_desc_##n.nil_desc,			\
 }
 
+/* Writable copy of the host-side MAC string (upstream uses a const literal),
+ * so CONFIG_USBD_CDC_NCM_HWINFO_MAC can personalize it from HWINFO at preinit.
+ * Same layout as USBD_DESC_STRING_DEFINE, only the backing buffer is mutable. */
+#define USBD_CDC_NCM_MAC_STRING_DEFINE(d_name, d_string)			\
+	static uint8_t ascii_##d_name[sizeof(d_string)] = d_string;		\
+	static struct usbd_desc_node d_name = {					\
+		.str = {							\
+			.utype = USBD_DUT_STRING_INTERFACE,			\
+			.ascii7 = true,						\
+		},								\
+		.ptr = ascii_##d_name,						\
+		.bLength = USB_STRING_DESCRIPTOR_LENGTH(d_string),		\
+		.bDescriptorType = USB_DESC_STRING,				\
+	}
+
 #define USBD_CDC_NCM_DT_DEVICE_DEFINE(n)					\
 	CDC_NCM_DEFINE_DESCRIPTOR(n);						\
-	USBD_DESC_STRING_DEFINE(mac_desc_data_##n,				\
-				DT_INST_PROP(n, remote_mac_address),		\
-				USBD_DUT_STRING_INTERFACE);			\
+	USBD_CDC_NCM_MAC_STRING_DEFINE(mac_desc_data_##n,			\
+				       DT_INST_PROP(n, remote_mac_address));	\
 										\
 	USBD_DEFINE_CLASS(cdc_ncm_##n,						\
 			  &usbd_cdc_ncm_api,					\
