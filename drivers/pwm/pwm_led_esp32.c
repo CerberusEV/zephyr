@@ -126,7 +126,27 @@ static int pwm_led_esp32_calculate_max_resolution(struct pwm_ledc_esp32_channel_
 			return 0;
 		}
 	}
-	return -EINVAL;
+
+	/* The frequency is too low for full resolution on this clock: cap the
+	 * resolution at the counter width and let the fractional prescaler
+	 * (range-checked in pwm_led_esp32_timer_set()) make up the rest,
+	 * instead of failing over to a slower clock source.
+	 *
+	 * Failing over is broken on SoCs where the low-speed clock mux is
+	 * GLOBAL (every SOC without SOC_LEDC_HAS_TIMER_SPECIFIC_MUX, e.g. the
+	 * ESP32-S3): timer_set() writes ledc_hal_set_slow_clk_sel() with the
+	 * per-channel choice, so two channels that select different sources
+	 * retune EACH OTHER's timer whenever either one is reconfigured.
+	 * Observed on DogWhistleEsp32 (2026-10-24): pilot 1 kHz landed on
+	 * RC_FAST (APB needs > 14 bits), relay 25 kHz on APB; every relay
+	 * duty change after a 0/100 % stop flipped the global mux to APB and
+	 * the pilot output jumped to ~4.4 kHz (x 80/18 MHz).  With the cap,
+	 * every achievable frequency succeeds on the first listed clock, the
+	 * mux is only ever written with one value, and timers derive from the
+	 * crystal-backed APB clock instead of the RC oscillator.
+	 */
+	channel->resolution = SOC_LEDC_TIMER_BIT_WIDTH;
+	return 0;
 }
 
 static int pwm_led_esp32_timer_config(struct pwm_ledc_esp32_channel_config *channel)
